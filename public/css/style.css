@@ -747,6 +747,7 @@ img { display: block; max-width: 100%; }
   object-fit: contain;
   border-radius: 8px;
   pointer-events: none;
+  background: #000; /* Ensure solid background so overlap isn't visible */
 }
 
 .hand-count {
@@ -820,10 +821,9 @@ img { display: block; max-width: 100%; }
 
 /* Not my turn state */
 .player-container:not(.my-turn) .hand-card {
-  opacity: 0.6;
-  filter: grayscale(0.3) brightness(0.8);
+  filter: grayscale(0.3) brightness(0.5); /* Use brightness instead of opacity */
   pointer-events: none;
-  transition: opacity 0.3s ease, filter 0.3s ease;
+  transition: filter 0.3s ease;
 }
 
 .player-container:not(.my-turn) .btn-draw {
