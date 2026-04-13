@@ -38,7 +38,10 @@
         <span class="room-badge" id="gameRoomCode">----</span>
         <span class="player-name" id="gamePlayerName">You</span>
       </div>
-      <div class="color-indicator" id="headerColorIndicator" data-color="Red"></div>
+      <div class="player-header-right" style="display: flex; align-items: center; gap: 12px;">
+        <div class="color-indicator" id="headerColorIndicator" data-color="Red"></div>
+        <button class="btn-menu" id="btnShowMenu" title="Game Menu">⚙️</button>
+      </div>
     </div>
 
     <!-- Status bar -->
@@ -114,6 +117,31 @@
     <h2 class="win-title" id="winTitle">WINNER!</h2>
     <p class="win-name" id="winName">Player Name</p>
     <button class="btn btn-primary btn-lg" id="btnNewGame">Play Again</button>
+  </div>
+
+  <!-- ═══════════ GAME MENU MODAL ═══════════ -->
+  <div class="modal-overlay" id="gameMenuModal">
+    <div class="modal-content modal-menu glass-elevated">
+      <h2 class="modal-title">Game Menu</h2>
+      <div class="menu-grid">
+        <button class="btn btn-secondary btn-block" id="btnRestartGame" data-host-only="true">🔄 Restart Game</button>
+        <button class="btn btn-danger btn-block" id="btnCloseRoom" data-host-only="true">🚪 Close Room</button>
+        <button class="btn btn-secondary btn-block" id="btnLeaveGame">🚶 Leave Game</button>
+        <button class="btn btn-primary btn-block mt-4" id="btnResumeGame">Resume</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ CONFIRM MODAL ═══════════ -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-content modal-menu glass-elevated">
+      <h2 class="modal-title" id="confirmTitle">Are you sure?</h2>
+      <p class="text-muted mb-4" id="confirmMessage" style="margin-bottom: 20px;">This action cannot be undone.</p>
+      <div class="flex gap-2">
+        <button class="btn btn-danger" id="btnConfirmYes">Yes, Proceed</button>
+        <button class="btn btn-secondary" id="btnConfirmNo">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <!-- Toast container -->

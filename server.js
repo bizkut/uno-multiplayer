@@ -253,6 +253,25 @@ io.on('connection', (socket) => {
     broadcastLobbyState(currentRoom);
   });
 
+  // ── Close Room ──
+  socket.on('close-room', (callback) => {
+    if (!currentRoom) return callback?.({ error: 'Not in a room' });
+    const roomData = rooms.get(currentRoom);
+    if (!roomData) return callback?.({ error: 'Room not found' });
+
+    const info = roomData.sockets.get(socket.id);
+    if (!info || info.playerId !== roomData.host) {
+      return callback?.({ error: 'Only the host can close the room' });
+    }
+
+    // Notify everyone
+    io.to(`room-${currentRoom}`).emit('room-closed');
+
+    // Clean up
+    rooms.delete(currentRoom);
+    callback?.({ success: true });
+  });
+
   // ── Disconnect ──
   socket.on('disconnect', () => {
     if (!currentRoom) return;

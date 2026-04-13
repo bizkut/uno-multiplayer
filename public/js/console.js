@@ -41,12 +41,27 @@
   const winName = $('#winName');
   const btnNewGame = $('#btnNewGame');
 
+  const btnShowMenu = $('#btnShowMenu');
+  const gameMenuModal = $('#gameMenuModal');
+  const btnRestartGame = $('#btnRestartGame');
+  const btnCloseRoom = $('#btnCloseRoom');
+  const btnLeaveGame = $('#btnLeaveGame');
+  const btnResumeGame = $('#btnResumeGame');
+
+  const confirmModal = $('#confirmModal');
+  const confirmTitle = $('#confirmTitle');
+  const confirmMessage = $('#confirmMessage');
+  const btnConfirmYes = $('#btnConfirmYes');
+  const btnConfirmNo = $('#btnConfirmNo');
+  let confirmCallback = null;
+  let socket = null;
+
   // ══════════════════════════════════════════════════
   // Initialize
   // ══════════════════════════════════════════════════
 
   function init() {
-    const socket = io();
+    socket = io();
 
     socket.on('connect', () => {
       if (isHost) {
@@ -70,7 +85,15 @@
             setTimeout(() => { window.location.href = '/'; }, 2000);
           }
         });
+      } else {
+        // Hide host-only buttons in menu
+        $$('[data-host-only="true"]').forEach(el => el.classList.add('hidden'));
       }
+    });
+
+    socket.on('room-closed', () => {
+      showToast('The host has closed the room', 'error');
+      setTimeout(() => { window.location.href = '/'; }, 2000);
     });
 
     socket.on('disconnect', () => {
@@ -244,6 +267,77 @@
 
   // ── Sound init ──
   document.addEventListener('click', () => sfx.init(), { once: true });
+
+  // ── Menu Logic ──
+  btnShowMenu.addEventListener('click', () => {
+    gameMenuModal.classList.add('active');
+    sfx.buttonClick();
+  });
+
+  btnResumeGame.addEventListener('click', () => {
+    gameMenuModal.classList.remove('active');
+    sfx.buttonClick();
+  });
+
+  btnRestartGame.addEventListener('click', () => {
+    showConfirm(
+      'Restart Game?',
+      'This will clear all hands and reshuffle the deck. All players will remain in the room.',
+      () => {
+        socket.emit('new-game', (res) => {
+          if (res.error) showToast(res.error, 'error');
+          gameMenuModal.classList.remove('active');
+        });
+      }
+    );
+  });
+
+  btnCloseRoom.addEventListener('click', () => {
+    showConfirm(
+      'Close Room?',
+      'This will kick all players and delete the room. All progress will be lost.',
+      () => {
+        socket.emit('close-room', (res) => {
+          if (res.error) {
+            showToast(res.error, 'error');
+          } else {
+            window.location.href = '/';
+          }
+        });
+      }
+    );
+  });
+
+  btnLeaveGame.addEventListener('click', () => {
+    showConfirm(
+      'Leave Session?',
+      'Are you sure you want to exit this console view?',
+      () => {
+        window.location.href = '/';
+      }
+    );
+  });
+
+  // ── Confirm Modal Logic ──
+  function showConfirm(title, message, onYes) {
+    confirmTitle.textContent = title;
+    confirmMessage.textContent = message;
+    confirmCallback = onYes;
+    confirmModal.classList.add('active');
+    sfx.error();
+  }
+
+  btnConfirmYes.addEventListener('click', () => {
+    if (confirmCallback) confirmCallback();
+    confirmModal.classList.remove('active');
+    sfx.buttonClick();
+  });
+
+  btnConfirmNo.addEventListener('click', () => {
+    confirmCallback = null;
+    confirmModal.classList.remove('active');
+    sfx.buttonClick();
+  });
 
   // ── Start ──
   init();

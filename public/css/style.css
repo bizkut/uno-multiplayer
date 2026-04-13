@@ -207,6 +207,38 @@ img { display: block; max-width: 100%; }
   width: 100%;
 }
 
+.btn-danger {
+  background: var(--uno-red);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-danger:hover {
+  background: #c1141a;
+  box-shadow: 0 4px 15px rgba(237, 28, 36, 0.4);
+}
+
+.btn-menu {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-medium);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  transition: all var(--transition-fast);
+}
+
+.btn-menu:hover {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+  transform: rotate(45deg);
+}
+
 .btn:disabled {
   opacity: 0.4;
   pointer-events: none;
@@ -428,9 +460,17 @@ img { display: block; max-width: 100%; }
 }
 
 .color-picker-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+.menu-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-content.modal-menu {
+  max-width: 300px;
 }
 
 .color-pick-btn {
