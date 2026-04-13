@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>UNO — Your Hand</title>
+  <meta name="theme-color" content="#0a0b10">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎴</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="bg-animated"></div>
+
+  <!-- ═══════════ LOBBY ═══════════ -->
+  <div class="lobby-container" id="lobbyView">
+    <div class="lobby-card glass-elevated">
+      <p class="lobby-label">Room Code</p>
+      <div class="lobby-room-code" id="lobbyRoomCode">----</div>
+      <p class="lobby-label">Share this code with your friends!</p>
+
+      <ul class="lobby-players" id="lobbyPlayerList"></ul>
+
+      <p class="text-muted" id="lobbyWaiting">Waiting for players<span class="waiting-dots"></span></p>
+
+      <button class="btn btn-primary btn-block btn-lg mt-4 hidden" id="btnStartGame">
+        🎮 Start Game
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════ GAME VIEW ═══════════ -->
+  <div class="player-container hidden" id="gameView">
+    <!-- Header -->
+    <div class="player-header">
+      <div class="player-header-left">
+        <span class="room-badge" id="gameRoomCode">----</span>
+        <span class="player-name" id="gamePlayerName">You</span>
+      </div>
+      <div class="color-indicator" id="headerColorIndicator" data-color="Red"></div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="game-status-bar">
+      <span id="turnIndicator" class="turn-indicator">Waiting...</span>
+      <span class="direction-icon" id="directionIcon">↻</span>
+    </div>
+
+    <!-- Center: discard preview + game info -->
+    <div class="game-center">
+      <div class="discard-preview" id="discardPreview">
+        <div class="card-back">
+          <span class="card-back-text">UNO</span>
+        </div>
+      </div>
+      <div class="draw-stack-badge hidden" id="drawStackBadge">Draw 0</div>
+      <div class="game-info-row">
+        <span>Deck: <strong id="deckCountLabel">108</strong></span>
+        <div class="color-indicator" id="centerColorIndicator" data-color="Red"></div>
+        <span id="colorLabel">Red</span>
+      </div>
+
+      <!-- Drawn card prompt -->
+      <div class="drawn-card-prompt" id="drawnCardPrompt">
+        <p>You drew a playable card!</p>
+        <div id="drawnCardPreview" style="margin: 8px auto; width: 60px; height: 90px;"></div>
+        <div class="prompt-buttons">
+          <button class="btn btn-green btn-sm" id="btnPlayDrawn">▶ Play It</button>
+          <button class="btn btn-secondary btn-sm" id="btnKeepDrawn">✋ Keep</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hand -->
+    <div class="hand-container">
+      <div class="hand-scroll" id="handScroll"></div>
+      <div class="hand-count" id="handCount">0 cards</div>
+    </div>
+
+    <!-- Action bar -->
+    <div class="action-bar">
+      <button class="btn btn-draw" id="btnDraw" disabled>📥 Draw</button>
+      <button class="btn btn-uno" id="btnUno">UNO!</button>
+      <button class="btn btn-secondary btn-sm" id="btnCatchUno" title="Catch someone who forgot UNO">🚨</button>
+    </div>
+  </div>
+
+  <!-- ═══════════ COLOR PICKER MODAL ═══════════ -->
+  <div class="modal-overlay" id="colorPickerModal">
+    <div class="modal-content glass-elevated">
+      <h2 class="modal-title">Choose Color</h2>
+      <div class="color-picker-grid">
+        <button class="color-pick-btn red" data-color="Red">Red</button>
+        <button class="color-pick-btn blue" data-color="Blue">Blue</button>
+        <button class="color-pick-btn green" data-color="Green">Green</button>
+        <button class="color-pick-btn yellow" data-color="Yellow">Yellow</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ CATCH UNO MODAL ═══════════ -->
+  <div class="modal-overlay" id="catchUnoModal">
+    <div class="modal-content glass-elevated">
+      <h2 class="modal-title">🚨 Catch Who?</h2>
+      <div id="catchPlayerList" class="flex flex-col gap-2"></div>
+      <button class="btn btn-secondary btn-sm mt-4" id="btnCloseCatch">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ═══════════ WIN OVERLAY ═══════════ -->
+  <div class="win-overlay" id="winOverlay">
+    <div class="win-trophy">🏆</div>
+    <h2 class="win-title" id="winTitle">WINNER!</h2>
+    <p class="win-name" id="winName">Player Name</p>
+    <button class="btn btn-primary btn-lg" id="btnNewGame">Play Again</button>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/sounds.js"></script>
+  <script src="/js/player.js"></script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UNO — Game Console</title>
+  <meta name="description" content="UNO Game Console — Central display showing the game table">
+  <meta name="theme-color" content="#0a0b10">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎴</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="bg-animated"></div>
+
+  <!-- ═══════════ LOBBY ═══════════ -->
+  <div class="lobby-container" id="lobbyView">
+    <div class="lobby-card glass-elevated">
+      <p class="lobby-label">Console Mode</p>
+      <p class="lobby-label" style="margin-top: 8px;">Room Code</p>
+      <div class="lobby-room-code" id="lobbyRoomCode">----</div>
+      <p class="lobby-label">Waiting for the host to start the game</p>
+      <ul class="lobby-players" id="lobbyPlayerList"></ul>
+      <p class="text-muted" id="lobbyWaiting">Connecting<span class="waiting-dots"></span></p>
+    </div>
+  </div>
+
+  <!-- ═══════════ CONSOLE GAME VIEW ═══════════ -->
+  <div class="console-container hidden" id="gameView">
+    <!-- Header -->
+    <div class="console-header">
+      <div class="console-logo">UNO</div>
+      <div class="console-room-code" id="consoleRoomCode">----</div>
+      <div class="console-status">
+        <span class="direction-display" id="directionDisplay">↻</span>
+        <div class="color-indicator large" id="consoleColorIndicator" data-color="Red"></div>
+        <span id="consoleColorLabel" style="font-weight:700; font-size:1.1rem;">Red</span>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="console-main">
+      <!-- Players strip -->
+      <div class="players-strip" id="playersStrip"></div>
+
+      <!-- Discard pile center -->
+      <div class="console-discard">
+        <div class="console-deck-info">
+          <span>Deck: <strong id="consoleDeckCount">108</strong></span>
+          <span id="consoleDrawStack" class="hidden" style="color: var(--uno-red); font-weight: 700;"></span>
+        </div>
+
+        <div class="discard-card-container">
+          <div class="card-large" id="consoleDiscardCard">
+            <div class="card-back" style="width:100%;height:100%;">
+              <span class="card-back-text">UNO</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="console-color-display">
+          <div class="color-indicator large" id="consoleColorIndicator2" data-color="Red"></div>
+          <span id="consoleCurrentTurn" style="font-size: 1.3rem;">Waiting to start...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Event feed -->
+    <div class="console-footer" id="consoleFooter">
+      <ul class="event-feed" id="eventFeed">
+        <li>Waiting for game to start...</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════ WIN OVERLAY ═══════════ -->
+  <div class="win-overlay" id="winOverlay">
+    <div class="win-trophy">🏆</div>
+    <h2 class="win-title" id="winTitle">WINNER!</h2>
+    <p class="win-name" id="winName">Player Name</p>
+    <button class="btn btn-primary btn-lg" id="btnNewGame">New Game</button>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/sounds.js"></script>
+  <script src="/js/console.js"></script>
+</body>
+</html>

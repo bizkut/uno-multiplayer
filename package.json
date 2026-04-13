@@ -1,0 +1,13 @@
+{
+  "name": "uno-multiplayer",
+  "version": "1.0.0",
+  "description": "Multiplayer UNO card game for physical play with mobile devices",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "socket.io": "^4.7.5"
+  }
+}
