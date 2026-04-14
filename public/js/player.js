@@ -468,6 +468,14 @@
     winTitle.textContent = winner.id === playerId ? 'YOU WIN! 🎉' : 'GAME OVER';
     winName.textContent = winner.name + ' wins!';
     winOverlay.classList.add('active');
+    
+    // Only the host should see the restart button
+    if (isHost) {
+      btnNewGame.classList.remove('hidden');
+    } else {
+      btnNewGame.classList.add('hidden');
+    }
+
     sfx.win();
     vibrate([200, 100, 200, 100, 400]);
   }

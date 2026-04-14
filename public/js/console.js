@@ -239,6 +239,14 @@
     winTitle.textContent = 'WINNER!';
     winName.textContent = winner.name + ' wins the game! 🎉';
     winOverlay.classList.add('active');
+
+    // Only host can see/trigger new game
+    if (isHost) {
+      btnNewGame.classList.remove('hidden');
+    } else {
+      btnNewGame.classList.add('hidden');
+    }
+
     sfx.win();
   }
 
