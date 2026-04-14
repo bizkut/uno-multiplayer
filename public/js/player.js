@@ -40,6 +40,7 @@
   const colorLabel = $('#colorLabel');
   const turnIndicator = $('#turnIndicator');
   const directionIcon = $('#directionIcon');
+  const unoAlertsArea = $('#unoAlertsArea');
   const deckCountLabel = $('#deckCountLabel');
   const drawStackBadge = $('#drawStackBadge');
   const btnDraw = $('#btnDraw');
@@ -198,6 +199,7 @@
     updateDeckCount(state);
     updateDrawStack(state);
     updateDirection(state);
+    updateUnoAlerts(state);
     renderHand();
     updateActionButtons();
     checkDrawnCardPrompt();
@@ -251,6 +253,35 @@
 
   function updateDirection(state) {
     directionIcon.textContent = state.direction === 1 ? '↻' : '↺';
+  }
+
+  function updateUnoAlerts(state) {
+    const me = state.players.find(p => p.id === playerId);
+    if (me) {
+      // Is it urgent to call UNO? (1 or 2 cards and not called)
+      const isUrgent = me.cardCount <= 2 && !me.calledUno;
+      btnUno.classList.toggle('pulsing', me.cardCount <= 2);
+      btnUno.classList.toggle('urgent', isUrgent);
+    }
+
+    // Build alerts for others
+    unoAlertsArea.innerHTML = '';
+    state.players.forEach(p => {
+      if (p.id === playerId) return;
+
+      if (p.calledUno && p.cardCount === 1) {
+        addUnoBadge(p.name, 'Declared UNO! ✅', 'success');
+      } else if (p.cardCount === 1) {
+        addUnoBadge(p.name, 'HAS 1 CARD! ⚠️', 'warning');
+      }
+    });
+  }
+
+  function addUnoBadge(name, text, type) {
+    const badge = document.createElement('div');
+    badge.className = `uno-alert-badge ${type}`;
+    badge.innerHTML = `<strong>${name}</strong> ${text}`;
+    unoAlertsArea.appendChild(badge);
   }
 
   function renderHand() {

@@ -875,6 +875,24 @@ img { display: block; max-width: 100%; }
   50% { box-shadow: 0 4px 30px rgba(237, 28, 36, 0.8), 0 0 60px rgba(237, 28, 36, 0.3); }
 }
 
+@keyframes unoPulseUrgent {
+  0%, 100% { 
+    box-shadow: 0 4px 15px rgba(237, 28, 36, 0.6);
+    transform: scale(1);
+    background: var(--uno-red);
+  }
+  50% { 
+    box-shadow: 0 4px 40px rgba(237, 28, 36, 1), 0 0 80px rgba(237, 28, 36, 0.5);
+    transform: scale(1.1);
+    background: #ff3c43;
+  }
+}
+
+.btn-uno.urgent {
+  animation: unoPulseUrgent 0.5s ease-in-out infinite;
+  border: 4px solid var(--uno-yellow);
+}
+
 /* Your turn glow */
 .player-container.my-turn {
   border: 3px solid var(--uno-green);
@@ -1361,4 +1379,62 @@ img { display: block; max-width: 100%; }
     flex-direction: column;
     max-width: 200px;
   }
+}
+
+/* UNO Status Alerts */
+.uno-alerts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.uno-alert-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 50px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  animation: slideInLeft 0.3s ease-out;
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.uno-alert-badge.warning {
+  background: rgba(237, 28, 36, 0.15);
+  color: #ff3c43;
+  border: 1px solid rgba(237, 28, 36, 0.3);
+  animation: unoPulse 1s ease-in-out infinite;
+}
+
+.uno-alert-badge.success {
+  background: rgba(44, 160, 28, 0.15);
+  color: var(--uno-green);
+  border: 1px solid rgba(44, 160, 28, 0.3);
+}
+
+.player-seat .seat-uno-badge {
+  display: none;
+  font-size: 0.75rem;
+  font-weight: 900;
+  color: white;
+  background: var(--uno-green);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.player-seat.has-uno .seat-uno-badge {
+  display: inline-block;
+}
+
+.player-seat.warning-1card .seat-cards {
+  background: var(--uno-red);
+  color: white;
+  animation: unoPulse 1s ease-in-out infinite;
 }

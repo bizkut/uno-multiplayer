@@ -46,7 +46,10 @@
 
     <!-- Status bar -->
     <div class="game-status-bar">
-      <span id="turnIndicator" class="turn-indicator">Waiting...</span>
+      <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+        <span id="turnIndicator" class="turn-indicator">Waiting...</span>
+        <div id="unoAlertsArea" class="uno-alerts-container"></div>
+      </div>
       <span class="direction-icon" id="directionIcon">↻</span>
     </div>
 

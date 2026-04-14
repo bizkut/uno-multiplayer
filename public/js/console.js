@@ -161,15 +161,17 @@
         seat.classList.add('active');
       }
 
-      if (p.calledUno && p.cardCount === 1) {
-        seat.classList.add('has-uno');
-      }
+      const hasUno = p.calledUno && p.cardCount === 1;
+      const needsUno = p.cardCount === 1 && !p.calledUno;
+
+      if (hasUno) seat.classList.add('has-uno');
+      if (needsUno) seat.classList.add('warning-1card');
 
       seat.innerHTML = `
         <span class="seat-name">${escapeHtml(p.name)}</span>
         <span class="seat-cards">${p.cardCount}</span>
         <span class="seat-label">${p.cardCount === 1 ? 'card' : 'cards'}</span>
-        <span class="seat-uno-badge">UNO!</span>
+        <div class="seat-uno-badge">${hasUno ? 'UNO!' : (needsUno ? '⚠️ NO UNO' : '')}</div>
       `;
 
       playersStrip.appendChild(seat);
