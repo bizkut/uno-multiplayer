@@ -55,6 +55,7 @@
   const winTitle = $('#winTitle');
   const winName = $('#winName');
   const btnNewGame = $('#btnNewGame');
+  const btnGoHome = $('#btnGoHome');
   const btnCatchUno = $('#btnCatchUno');
   const catchUnoModal = $('#catchUnoModal');
   const catchPlayerList = $('#catchPlayerList');
@@ -461,6 +462,10 @@
         }
       });
     }
+  });
+
+  btnGoHome.addEventListener('click', () => {
+    window.location.href = '/';
   });
 
   // ── Win Screen ──

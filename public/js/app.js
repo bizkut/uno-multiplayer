@@ -14,6 +14,9 @@
   const btnCreate = $('#btnCreate');
   const btnJoin = $('#btnJoin');
   const roleToggle = $('#roleToggle');
+  const rejoinSection = $('#rejoinSection');
+  const rejoinText = $('#rejoinText');
+  const btnRejoin = $('#btnRejoin');
 
   // ── Role Toggle ──
   roleToggle.addEventListener('click', (e) => {
@@ -118,12 +121,36 @@
     }, 3000);
   }
 
-  // ── Restore name from previous session ──
-  const prev = localStorage.getItem('uno_session');
-  if (prev) {
+  // ── Restore session & Rejoin logic ──
+  function checkRecentSession() {
+    const prev = localStorage.getItem('uno_session');
+    if (!prev) return;
+
     try {
       const s = JSON.parse(prev);
       if (s.playerName) nameInput.value = s.playerName;
+
+      // Show rejoin button if there's a recent room code
+      if (s.roomCode) {
+        rejoinSection.classList.remove('hidden');
+        rejoinText.textContent = `Room ${s.roomCode}`;
+        
+        btnRejoin.onclick = () => {
+          const name = validateName();
+          if (!name) return;
+
+          s.playerName = name;
+          s.isHost = false; // Always rejoin as guest unless they were the host who closed/re-hosted
+          // Actually, if they were host, they might want to re-host. 
+          // But usually Rejoin implies guest. 
+          
+          localStorage.setItem('uno_session', JSON.stringify(s));
+          const target = s.role === 'console' ? '/console.html' : '/player.html';
+          window.location.href = target;
+        };
+      }
     } catch (e) {}
   }
+
+  checkRecentSession();
 })();

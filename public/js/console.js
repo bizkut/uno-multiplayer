@@ -40,6 +40,7 @@
   const winTitle = $('#winTitle');
   const winName = $('#winName');
   const btnNewGame = $('#btnNewGame');
+  const btnGoHome = $('#btnGoHome');
 
   const btnShowMenu = $('#btnShowMenu');
   const gameMenuModal = $('#gameMenuModal');
@@ -252,6 +253,10 @@
 
   btnNewGame.addEventListener('click', () => {
     winOverlay.classList.remove('active');
+  });
+
+  btnGoHome.addEventListener('click', () => {
+    window.location.href = '/';
   });
 
   // ── Utilities ──
