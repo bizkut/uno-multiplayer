@@ -25,6 +25,8 @@
   let pendingWildCardId = null;
   let myHand = [];
   let isMyTurn = false;
+  let winScreenShown = false;
+  let hasConnected = false;
 
   // ── Elements ──
   const lobbyView = $('#lobbyView');
@@ -93,6 +95,15 @@
     socket = io();
 
     socket.on('connect', () => {
+      if (hasConnected) {
+        // Reconnection — rejoin existing room instead of creating duplicate
+        if (roomCode) {
+          socket.emit('join-room', { roomCode, playerName, playerId, role: 'player' }, () => {});
+        }
+        return;
+      }
+      hasConnected = true;
+
       if (isHost) {
         socket.emit('create-room', { playerName, playerId, role: 'player' }, (res) => {
           if (res.success) {
@@ -153,9 +164,12 @@
     lobbyPlayerList.innerHTML = '';
     (data.players || []).forEach(p => {
       const li = document.createElement('li');
-      li.textContent = p.name;
+      li.appendChild(document.createTextNode(p.name));
       if (p.id === data.hostId) {
-        li.innerHTML += ' <span class="host-badge">HOST</span>';
+        const badge = document.createElement('span');
+        badge.className = 'host-badge';
+        badge.textContent = ' HOST';
+        li.appendChild(badge);
       }
       if (p.id === playerId) {
         li.style.color = 'var(--uno-green)';
@@ -205,9 +219,11 @@
     checkDrawnCardPrompt();
 
     // Game over
-    if (state.status === 'finished' && state.winner) {
+    if (state.status === 'finished' && state.winner && !winScreenShown) {
+      winScreenShown = true;
       showWinScreen(state.winner);
     }
+    if (state.status !== 'finished') winScreenShown = false;
 
     // Your turn glow
     gameView.classList.toggle('my-turn', isMyTurn);
@@ -280,7 +296,10 @@
   function addUnoBadge(name, text, type) {
     const badge = document.createElement('div');
     badge.className = `uno-alert-badge ${type}`;
-    badge.innerHTML = `<strong>${name}</strong> ${text}`;
+    const strong = document.createElement('strong');
+    strong.textContent = name;
+    badge.appendChild(strong);
+    badge.appendChild(document.createTextNode(' ' + text));
     unoAlertsArea.appendChild(badge);
   }
 
@@ -485,6 +504,7 @@
   // ── New Game ──
   btnNewGame.addEventListener('click', () => {
     winOverlay.classList.remove('active');
+    winScreenShown = false;
     if (isHost) {
       socket.emit('new-game', (res) => {
         if (res && res.success) {

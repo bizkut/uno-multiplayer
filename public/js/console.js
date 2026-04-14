@@ -5,6 +5,7 @@
  */
 (function () {
   const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
 
   // ── Session ──
   const session = JSON.parse(localStorage.getItem('uno_session'));
@@ -19,6 +20,8 @@
 
   // ── State ──
   let prevDiscardImage = null;
+  let winScreenShown = false;
+  let hasConnected = false;
 
   // ── Elements ──
   const lobbyView = $('#lobbyView');
@@ -64,7 +67,21 @@
   function init() {
     socket = io();
 
+    // Hide host-only buttons for guests
+    if (!isHost) {
+      $$('[data-host-only="true"]').forEach(el => el.classList.add('hidden'));
+    }
+
     socket.on('connect', () => {
+      if (hasConnected) {
+        // Reconnection — rejoin existing room
+        if (roomCode) {
+          socket.emit('join-room', { roomCode, playerName, playerId, role: 'console' }, () => {});
+        }
+        return;
+      }
+      hasConnected = true;
+
       if (isHost) {
         socket.emit('create-room', { playerName, playerId, role: 'console' }, (res) => {
           if (res.success) {
@@ -86,9 +103,6 @@
             setTimeout(() => { window.location.href = '/'; }, 2000);
           }
         });
-      } else {
-        // Hide host-only buttons in menu
-        $$('[data-host-only="true"]').forEach(el => el.classList.add('hidden'));
       }
     });
 
@@ -123,9 +137,12 @@
     lobbyPlayerList.innerHTML = '';
     (data.players || []).forEach(p => {
       const li = document.createElement('li');
-      li.textContent = p.name;
+      li.appendChild(document.createTextNode(p.name));
       if (p.id === data.hostId) {
-        li.innerHTML += ' <span class="host-badge">HOST</span>';
+        const badge = document.createElement('span');
+        badge.className = 'host-badge';
+        badge.textContent = ' HOST';
+        li.appendChild(badge);
       }
       lobbyPlayerList.appendChild(li);
     });
@@ -145,9 +162,11 @@
     updateCurrentTurn(state);
     updateEventFeed(state);
 
-    if (state.status === 'finished' && state.winner) {
+    if (state.status === 'finished' && state.winner && !winScreenShown) {
+      winScreenShown = true;
       showWin(state.winner);
     }
+    if (state.status !== 'finished') winScreenShown = false;
   }
 
   function updatePlayers(state) {
@@ -255,6 +274,15 @@
 
   btnNewGame.addEventListener('click', () => {
     winOverlay.classList.remove('active');
+    winScreenShown = false;
+    if (isHost) {
+      socket.emit('new-game', (res) => {
+        if (res && res.success) {
+          gameView.classList.add('hidden');
+          lobbyView.classList.remove('hidden');
+        }
+      });
+    }
   });
 
   btnGoHome.addEventListener('click', () => {

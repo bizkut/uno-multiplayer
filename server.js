@@ -28,13 +28,22 @@ const rooms = new Map();
 
 function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 4; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  // Ensure uniqueness
-  if (rooms.has(code)) return generateRoomCode();
+  let code;
+  let attempts = 0;
+  do {
+    code = '';
+    for (let i = 0; i < 4; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    attempts++;
+    if (attempts > 100) throw new Error('Cannot generate unique room code');
+  } while (rooms.has(code));
   return code;
+}
+
+function sanitize(str, maxLen = 16) {
+  if (typeof str !== 'string') return '';
+  return str.trim().slice(0, maxLen);
 }
 
 function broadcastLobbyState(roomCode) {
@@ -59,8 +68,19 @@ function broadcastGameState(roomCode) {
   const roomData = rooms.get(roomCode);
   if (!roomData || !roomData.game) return;
 
-  const state = roomData.game.getState();
-  io.to(`room-${roomCode}`).emit('game-state', state);
+  const fullState = roomData.game.getState();
+
+  // Send per-player state — each client only sees their own hand
+  roomData.sockets.forEach((info, socketId) => {
+    const state = {
+      ...fullState,
+      players: fullState.players.map(p => ({
+        ...p,
+        hand: p.id === info.playerId ? p.hand : undefined,
+      })),
+    };
+    io.to(socketId).emit('game-state', state);
+  });
 }
 
 function getPlayerIdBySocket(roomCode, socketId) {
@@ -87,6 +107,11 @@ io.on('connection', (socket) => {
 
   // ── Create Room ──
   socket.on('create-room', ({ playerName, playerId, role }, callback) => {
+    playerName = sanitize(playerName, 16);
+    playerId = sanitize(playerId, 64);
+    role = ['player', 'console'].includes(role) ? role : 'player';
+    if (!playerName || !playerId) return callback?.({ error: 'Invalid input' });
+
     const roomCode = generateRoomCode();
     const game = new UnoGame(roomCode);
 
@@ -112,6 +137,10 @@ io.on('connection', (socket) => {
 
   // ── Join Room ──
   socket.on('join-room', ({ roomCode, playerName, playerId, role }, callback) => {
+    playerName = sanitize(playerName, 16);
+    playerId = sanitize(playerId, 64);
+    role = ['player', 'console'].includes(role) ? role : 'player';
+    if (!playerName || !playerId) return callback?.({ error: 'Invalid input' });
     roomCode = (roomCode || '').toUpperCase();
     const roomData = rooms.get(roomCode);
 
@@ -266,6 +295,10 @@ io.on('connection', (socket) => {
 
     // Notify everyone
     io.to(`room-${currentRoom}`).emit('room-closed');
+
+    // Force all sockets to leave the channel
+    const roomChannel = `room-${currentRoom}`;
+    io.in(roomChannel).socketsLeave(roomChannel);
 
     // Clean up
     rooms.delete(currentRoom);
