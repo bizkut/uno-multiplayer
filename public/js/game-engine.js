@@ -1,7 +1,6 @@
 /**
  * UNO Game Engine
- * Runs in the host player's browser — handles all game logic, validation, state.
- * Broadcasts state via Pusher client events.
+ * Server-side game logic, validation, and state management.
  */
 class UnoGame {
   constructor(roomCode) {
@@ -232,9 +231,14 @@ class UnoGame {
       return { error: 'Invalid play — must match color, number, or play a Wild' };
     }
 
-    // Wild cards need a color choice
+    // Wild cards need a color choice — return clean signal (not an error)
     if (card.color === 'Wild' && !chosenColor) {
-      return { error: 'Choose a color', needsColor: true };
+      return { needsColor: true, cardId: card.id };
+    }
+
+    // Validate chosen color is a real UNO color
+    if (card.color === 'Wild' && !['Red', 'Blue', 'Green', 'Yellow'].includes(chosenColor)) {
+      return { error: 'Invalid color choice' };
     }
 
     // ── Execute the play ──
@@ -250,14 +254,21 @@ class UnoGame {
       this.currentColor = card.color;
     }
 
+    // Reset calledUno after playing — must re-call for next time
+    if (player.hand.length > 1) {
+      player.calledUno = false;
+    }
+
     // Event log
     const cardLabel = card.color === 'Wild'
-      ? `${card.value.replace('_', ' ')} → ${chosenColor}`
-      : `${card.color} ${card.value.replace('_', ' ')}`;
+      ? `${card.value.replace(/_/g, ' ')} → ${chosenColor}`
+      : `${card.color} ${card.value.replace(/_/g, ' ')}`;
     this.addEvent(`${player.name} played ${cardLabel}`);
 
     // Check for win
     if (player.hand.length === 0) {
+      // Apply card effects even on winning card (for log consistency)
+      this.applyCardEffect(card);
       this.status = 'finished';
       this.winner = player;
       this.addEvent(`🎉🏆 ${player.name} WINS THE GAME!`);
@@ -295,6 +306,14 @@ class UnoGame {
   // ──────────────────── Card Effects ────────────────────
 
   applyCardEffect(card) {
+    // Don't apply gameplay effects if game just ended
+    if (this.status === 'finished') {
+      if (card.value === 'Draw_2' || card.value === 'Wild_Draw_4') {
+        this.addEvent(`(Game over — draw penalty not applied)`);
+      }
+      return;
+    }
+
     switch (card.value) {
       case 'Skip':
         this.addEvent(`⏭️ ${this.getNextPlayer().name} is skipped!`);
@@ -337,7 +356,8 @@ class UnoGame {
     if (this.drawStack > 0) {
       const count = this.drawStack;
       for (let i = 0; i < count; i++) {
-        this._drawFromDeck(player);
+        const drawn = this._drawFromDeck(player);
+        if (!drawn) break; // Stop if deck is truly empty
       }
       this.drawStack = 0;
       this.addEvent(`${player.name} drew ${count} cards 📥`);
@@ -347,6 +367,9 @@ class UnoGame {
 
     // Regular draw — draw 1
     const card = this._drawFromDeck(player);
+    if (!card) {
+      return { error: 'No cards left to draw' };
+    }
     this.addEvent(`${player.name} drew a card`);
 
     // Can the drawn card be played?
@@ -373,6 +396,11 @@ class UnoGame {
   _drawFromDeck(player) {
     if (this.deck.length === 0) {
       this._reshuffleDeck();
+    }
+    // Guard against truly empty deck (discard pile also exhausted)
+    if (this.deck.length === 0) {
+      this.addEvent('⚠️ No cards left in the deck!');
+      return null;
     }
     const card = this.deck.pop();
     player.hand.push(card);
@@ -406,6 +434,7 @@ class UnoGame {
     const target = this.players.find(p => p.id === targetId);
 
     if (!caller || !target) return { error: 'Player not found' };
+    if (callerId === targetId) return { error: 'Cannot catch yourself' };
 
     if (target.hand.length === 1 && !target.calledUno) {
       // Caught! Penalty: draw 2

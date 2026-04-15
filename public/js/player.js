@@ -245,7 +245,12 @@
 
   function updateDiscard(state) {
     if (!state.discardTop) return;
-    discardPreview.innerHTML = `<img class="card-img card-play-anim" src="${CARD_BASE}${state.discardTop.image}" alt="${state.discardTop.color} ${state.discardTop.value}">`;
+    discardPreview.innerHTML = '';
+    const img = document.createElement('img');
+    img.className = 'card-img card-play-anim';
+    img.src = `${CARD_BASE}${state.discardTop.image}`;
+    img.alt = `${state.discardTop.color} ${state.discardTop.value}`;
+    discardPreview.appendChild(img);
   }
 
   function updateColorIndicator(state) {

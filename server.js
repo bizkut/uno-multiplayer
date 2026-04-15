@@ -11,7 +11,11 @@ const UnoGame = require('./public/js/game-engine');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*' },
+  cors: {
+    origin: process.env.NODE_ENV === 'production'
+      ? false  // same-origin only in production
+      : '*',
+  },
   pingInterval: 10000,
   pingTimeout: 20000,
 });
@@ -43,7 +47,12 @@ function generateRoomCode() {
 
 function sanitize(str, maxLen = 16) {
   if (typeof str !== 'string') return '';
-  return str.trim().slice(0, maxLen);
+  // Strip HTML-significant chars and control characters
+  return str
+    .replace(/[<>&"']/g, '')
+    .replace(/[\x00-\x1F\x7F]/g, '')
+    .trim()
+    .slice(0, maxLen);
 }
 
 function broadcastLobbyState(roomCode) {
@@ -70,14 +79,22 @@ function broadcastGameState(roomCode) {
 
   const fullState = roomData.game.getState();
 
+  // Pre-build the "no hands" version once for efficiency
+  const sharedPlayers = fullState.players.map(p => ({
+    ...p,
+    hand: undefined,
+  }));
+
   // Send per-player state — each client only sees their own hand
   roomData.sockets.forEach((info, socketId) => {
+    const playerData = fullState.players.find(p => p.id === info.playerId);
     const state = {
       ...fullState,
-      players: fullState.players.map(p => ({
-        ...p,
-        hand: p.id === info.playerId ? p.hand : undefined,
-      })),
+      players: sharedPlayers.map(p =>
+        p.id === info.playerId
+          ? { ...p, hand: playerData?.hand }
+          : p
+      ),
     };
     io.to(socketId).emit('game-state', state);
   });
@@ -156,6 +173,13 @@ io.on('connection', (socket) => {
       if (result.error) return callback({ error: result.error });
     }
 
+    // Clean up stale socket entries for this playerId (e.g. from a reconnect)
+    for (const [existingSocketId, existingInfo] of roomData.sockets) {
+      if (existingInfo.playerId === playerId && existingSocketId !== socket.id) {
+        roomData.sockets.delete(existingSocketId);
+      }
+    }
+
     roomData.sockets.set(socket.id, { playerId, name: playerName, role });
     callback({ success: true, roomCode });
 
@@ -201,9 +225,10 @@ io.on('connection', (socket) => {
     const result = roomData.game.playCard(playerId, cardId, chosenColor);
     callback?.(result);
 
-    if (result.success || result.needsColor) {
+    if (result.success) {
       broadcastGameState(currentRoom);
     }
+    // needsColor does NOT broadcast — it's a prompt for the same player
   });
 
   // ── Draw Card ──
@@ -302,6 +327,7 @@ io.on('connection', (socket) => {
 
     // Clean up
     rooms.delete(currentRoom);
+    currentRoom = null;
     callback?.({ success: true });
   });
 

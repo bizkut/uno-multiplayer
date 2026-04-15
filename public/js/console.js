@@ -202,12 +202,13 @@
 
     const newImage = state.discardTop.image;
     if (newImage !== prevDiscardImage) {
-      consoleDiscardCard.innerHTML = `
-        <img class="card-img card-play-anim"
-             src="${CARD_BASE}${newImage}"
-             alt="${state.discardTop.color} ${state.discardTop.value}"
-             style="width:100%; height:100%; border-radius: var(--radius-card);">
-      `;
+      consoleDiscardCard.innerHTML = '';
+      const img = document.createElement('img');
+      img.className = 'card-img card-play-anim';
+      img.src = `${CARD_BASE}${newImage}`;
+      img.alt = `${state.discardTop.color} ${state.discardTop.value}`;
+      img.style.cssText = 'width:100%; height:100%; border-radius: var(--radius-card);';
+      consoleDiscardCard.appendChild(img);
       prevDiscardImage = newImage;
       sfx.cardPlay();
     }
