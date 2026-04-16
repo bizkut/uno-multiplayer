@@ -267,8 +267,6 @@ class UnoGame {
 
     // Check for win
     if (player.hand.length === 0) {
-      // Apply card effects even on winning card (for log consistency)
-      this.applyCardEffect(card);
       this.status = 'finished';
       this.winner = player;
       this.addEvent(`🎉🏆 ${player.name} WINS THE GAME!`);

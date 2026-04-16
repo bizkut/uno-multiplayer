@@ -5,6 +5,14 @@
 (function () {
   const $ = (sel) => document.querySelector(sel);
 
+  const CONFIG = {
+    PLAYER_URL: '/player.html',
+    CONSOLE_URL: '/console.html',
+    MAX_NAME_LEN: 16,
+    SESSION_KEY: 'uno_session',
+    PLAYER_ID_KEY: 'uno_player_id'
+  };
+
   // ── State ──
   let selectedRole = 'player';
 
@@ -29,10 +37,13 @@
 
   // ── Generate Player ID ──
   function getOrCreatePlayerId() {
-    let id = localStorage.getItem('uno_player_id');
+    let id = localStorage.getItem(CONFIG.PLAYER_ID_KEY);
     if (!id) {
-      id = 'p_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now().toString(36);
-      localStorage.setItem('uno_player_id', id);
+      // Use crypto.randomUUID if available, else fallback to robust random string
+      id = (window.crypto && window.crypto.randomUUID)
+        ? window.crypto.randomUUID()
+        : 'p_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now().toString(36);
+      localStorage.setItem(CONFIG.PLAYER_ID_KEY, id);
     }
     return id;
   }
@@ -45,7 +56,14 @@
       nameInput.focus();
       return null;
     }
-    return name;
+    return name.slice(0, CONFIG.MAX_NAME_LEN);
+  }
+
+  // ── Navigation ──
+  function navigateToGame(session) {
+    localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(session));
+    const target = session.role === 'console' ? CONFIG.CONSOLE_URL : CONFIG.PLAYER_URL;
+    window.location.href = target;
   }
 
   // ── Create Room ──
@@ -53,17 +71,13 @@
     const name = validateName();
     if (!name) return;
 
-    const session = {
+    navigateToGame({
       roomCode: null, // Server generates the room code
       playerName: name,
       playerId: getOrCreatePlayerId(),
       role: selectedRole,
       isHost: true,
-    };
-    localStorage.setItem('uno_session', JSON.stringify(session));
-
-    const target = selectedRole === 'console' ? '/console.html' : '/player.html';
-    window.location.href = target;
+    });
   });
 
   // ── Join Room ──
@@ -78,17 +92,13 @@
       return;
     }
 
-    const session = {
+    navigateToGame({
       roomCode: code,
       playerName: name,
       playerId: getOrCreatePlayerId(),
       role: selectedRole,
       isHost: false,
-    };
-    localStorage.setItem('uno_session', JSON.stringify(session));
-
-    const target = selectedRole === 'console' ? '/console.html' : '/player.html';
-    window.location.href = target;
+    });
   });
 
   // ── Room code input: auto uppercase ──
@@ -123,7 +133,7 @@
 
   // ── Restore session & Rejoin logic ──
   function checkRecentSession() {
-    const prev = localStorage.getItem('uno_session');
+    const prev = localStorage.getItem(CONFIG.SESSION_KEY);
     if (!prev) return;
 
     try {
@@ -134,22 +144,20 @@
       if (s.roomCode) {
         rejoinSection.classList.remove('hidden');
         rejoinText.textContent = `Room ${s.roomCode}`;
-        
-        btnRejoin.onclick = () => {
+
+        btnRejoin.addEventListener('click', () => {
           const name = validateName();
           if (!name) return;
 
           s.playerName = name;
-          s.isHost = false; // Always rejoin as guest unless they were the host who closed/re-hosted
-          // Actually, if they were host, they might want to re-host. 
-          // But usually Rejoin implies guest. 
-          
-          localStorage.setItem('uno_session', JSON.stringify(s));
-          const target = s.role === 'console' ? '/console.html' : '/player.html';
-          window.location.href = target;
-        };
+          // Keep s.isHost as it was originally saved
+          navigateToGame(s);
+        }, { once: true });
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error('Failed to parse session', e);
+      localStorage.removeItem(CONFIG.SESSION_KEY);
+    }
   }
 
   checkRecentSession();

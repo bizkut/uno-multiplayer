@@ -6,6 +6,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const crypto = require('crypto');
 const UnoGame = require('./public/js/game-engine');
 
 const app = express();
@@ -36,8 +37,9 @@ function generateRoomCode() {
   let attempts = 0;
   do {
     code = '';
+    const bytes = crypto.randomBytes(4);
     for (let i = 0; i < 4; i++) {
-      code += chars[Math.floor(Math.random() * chars.length)];
+      code += chars[bytes[i] % chars.length];
     }
     attempts++;
     if (attempts > 100) throw new Error('Cannot generate unique room code');
@@ -79,20 +81,21 @@ function broadcastGameState(roomCode) {
 
   const fullState = roomData.game.getState();
 
-  // Pre-build the "no hands" version once for efficiency
-  const sharedPlayers = fullState.players.map(p => ({
+  // Pre-build public player data (hands hidden)
+  const publicPlayers = fullState.players.map(p => ({
     ...p,
     hand: undefined,
   }));
 
   // Send per-player state — each client only sees their own hand
   roomData.sockets.forEach((info, socketId) => {
-    const playerData = fullState.players.find(p => p.id === info.playerId);
+    // Find this player's actual hand from the fullState
+    const myPlayer = fullState.players.find(p => p.id === info.playerId);
     const state = {
       ...fullState,
-      players: sharedPlayers.map(p =>
+      players: publicPlayers.map(p =>
         p.id === info.playerId
-          ? { ...p, hand: playerData?.hand }
+          ? { ...p, hand: myPlayer?.hand }
           : p
       ),
     };
@@ -105,6 +108,20 @@ function getPlayerIdBySocket(roomCode, socketId) {
   if (!roomData) return null;
   const info = roomData.sockets.get(socketId);
   return info ? info.playerId : null;
+}
+
+function getRoomContext(socket, callback) {
+  const { roomCode, playerId } = socket.data;
+  if (!roomCode || !playerId) {
+    callback?.({ error: 'Not in a room or invalid session' });
+    return null;
+  }
+  const roomData = rooms.get(roomCode);
+  if (!roomData) {
+    callback?.({ error: 'Room not found' });
+    return null;
+  }
+  return { roomCode, playerId, roomData };
 }
 
 // ── Clean up empty rooms periodically ──
@@ -140,6 +157,8 @@ io.on('connection', (socket) => {
 
     rooms.set(roomCode, roomData);
     socket.join(`room-${roomCode}`);
+    socket.data.roomCode = roomCode;
+    socket.data.playerId = playerId;
     currentRoom = roomCode;
 
     if (role === 'player') {
@@ -166,6 +185,8 @@ io.on('connection', (socket) => {
     }
 
     socket.join(`room-${roomCode}`);
+    socket.data.roomCode = roomCode;
+    socket.data.playerId = playerId;
     currentRoom = roomCode;
 
     if (role === 'player' && roomData.game.status === 'waiting') {
@@ -196,13 +217,12 @@ io.on('connection', (socket) => {
 
   // ── Start Game ──
   socket.on('start-game', (callback) => {
-    if (!currentRoom) return callback?.({ error: 'Not in a room' });
-    const roomData = rooms.get(currentRoom);
-    if (!roomData) return callback?.({ error: 'Room not found' });
+    const context = getRoomContext(socket, callback);
+    if (!context) return;
+    const { roomCode, playerId, roomData } = context;
 
     // Only host can start
-    const info = roomData.sockets.get(socket.id);
-    if (!info || info.playerId !== roomData.host) {
+    if (playerId !== roomData.host) {
       return callback?.({ error: 'Only the host can start the game' });
     }
 
@@ -210,124 +230,109 @@ io.on('connection', (socket) => {
     if (result.error) return callback?.({ error: result.error });
 
     callback?.({ success: true });
-    broadcastGameState(currentRoom);
+    broadcastGameState(roomCode);
   });
 
   // ── Play Card ──
   socket.on('play-card', ({ cardId, chosenColor }, callback) => {
-    if (!currentRoom) return callback?.({ error: 'Not in a room' });
-    const roomData = rooms.get(currentRoom);
-    if (!roomData) return callback?.({ error: 'Room not found' });
+    const context = getRoomContext(socket, callback);
+    if (!context) return;
+    const { roomCode, playerId, roomData } = context;
 
-    const playerId = getPlayerIdBySocket(currentRoom, socket.id);
-    if (!playerId) return callback?.({ error: 'Player not found' });
+    if (typeof cardId !== 'number') return callback?.({ error: 'Invalid card ID' });
 
     const result = roomData.game.playCard(playerId, cardId, chosenColor);
     callback?.(result);
 
     if (result.success) {
-      broadcastGameState(currentRoom);
+      broadcastGameState(roomCode);
     }
-    // needsColor does NOT broadcast — it's a prompt for the same player
   });
 
   // ── Draw Card ──
   socket.on('draw-card', (callback) => {
-    if (!currentRoom) return callback?.({ error: 'Not in a room' });
-    const roomData = rooms.get(currentRoom);
-    if (!roomData) return callback?.({ error: 'Room not found' });
-
-    const playerId = getPlayerIdBySocket(currentRoom, socket.id);
-    if (!playerId) return callback?.({ error: 'Player not found' });
+    const context = getRoomContext(socket, callback);
+    if (!context) return;
+    const { roomCode, playerId, roomData } = context;
 
     const result = roomData.game.drawCard(playerId);
     callback?.(result);
-    broadcastGameState(currentRoom);
+    broadcastGameState(roomCode);
   });
 
   // ── Keep Drawn Card (don't play it) ──
   socket.on('keep-card', (callback) => {
-    if (!currentRoom) return callback?.({ error: 'Not in a room' });
-    const roomData = rooms.get(currentRoom);
-    if (!roomData) return callback?.({ error: 'Room not found' });
-
-    const playerId = getPlayerIdBySocket(currentRoom, socket.id);
-    if (!playerId) return callback?.({ error: 'Player not found' });
+    const context = getRoomContext(socket, callback);
+    if (!context) return;
+    const { roomCode, playerId, roomData } = context;
 
     const result = roomData.game.keepDrawnCard(playerId);
     callback?.(result);
-    broadcastGameState(currentRoom);
+    broadcastGameState(roomCode);
   });
 
   // ── Call UNO ──
   socket.on('call-uno', (callback) => {
-    if (!currentRoom) return callback?.({ error: 'Not in a room' });
-    const roomData = rooms.get(currentRoom);
-    if (!roomData) return callback?.({ error: 'Room not found' });
-
-    const playerId = getPlayerIdBySocket(currentRoom, socket.id);
-    if (!playerId) return callback?.({ error: 'Player not found' });
+    const context = getRoomContext(socket, callback);
+    if (!context) return;
+    const { roomCode, playerId, roomData } = context;
 
     const result = roomData.game.callUno(playerId);
     callback?.(result);
-    broadcastGameState(currentRoom);
+    broadcastGameState(roomCode);
   });
 
   // ── Catch UNO ──
   socket.on('catch-uno', ({ targetId }, callback) => {
-    if (!currentRoom) return callback?.({ error: 'Not in a room' });
-    const roomData = rooms.get(currentRoom);
-    if (!roomData) return callback?.({ error: 'Room not found' });
+    const context = getRoomContext(socket, callback);
+    if (!context) return;
+    const { roomCode, playerId, roomData } = context;
 
-    const playerId = getPlayerIdBySocket(currentRoom, socket.id);
-    if (!playerId) return callback?.({ error: 'Player not found' });
+    if (typeof targetId !== 'string') return callback?.({ error: 'Invalid target player ID' });
 
     const result = roomData.game.catchUno(playerId, targetId);
     callback?.(result);
-    broadcastGameState(currentRoom);
+    broadcastGameState(roomCode);
   });
 
   // ── New Game (restart) ──
   socket.on('new-game', (callback) => {
-    if (!currentRoom) return callback?.({ error: 'Not in a room' });
-    const roomData = rooms.get(currentRoom);
-    if (!roomData) return callback?.({ error: 'Room not found' });
+    const context = getRoomContext(socket, callback);
+    if (!context) return;
+    const { roomCode, playerId, roomData } = context;
 
-    const info = roomData.sockets.get(socket.id);
-    if (!info || info.playerId !== roomData.host) {
+    if (playerId !== roomData.host) {
       return callback?.({ error: 'Only the host can restart' });
     }
 
     // Keep players, reset game
     const players = roomData.game.players.map(p => ({ id: p.id, name: p.name }));
-    roomData.game = new UnoGame(currentRoom);
+    roomData.game = new UnoGame(roomCode);
     players.forEach(p => roomData.game.addPlayer(p.id, p.name));
 
     callback?.({ success: true });
-    broadcastLobbyState(currentRoom);
+    broadcastLobbyState(roomCode);
   });
 
   // ── Close Room ──
   socket.on('close-room', (callback) => {
-    if (!currentRoom) return callback?.({ error: 'Not in a room' });
-    const roomData = rooms.get(currentRoom);
-    if (!roomData) return callback?.({ error: 'Room not found' });
+    const context = getRoomContext(socket, callback);
+    if (!context) return;
+    const { roomCode, playerId, roomData } = context;
 
-    const info = roomData.sockets.get(socket.id);
-    if (!info || info.playerId !== roomData.host) {
+    if (playerId !== roomData.host) {
       return callback?.({ error: 'Only the host can close the room' });
     }
 
     // Notify everyone
-    io.to(`room-${currentRoom}`).emit('room-closed');
+    io.to(`room-${roomCode}`).emit('room-closed');
 
     // Force all sockets to leave the channel
-    const roomChannel = `room-${currentRoom}`;
+    const roomChannel = `room-${roomCode}`;
     io.in(roomChannel).socketsLeave(roomChannel);
 
     // Clean up
-    rooms.delete(currentRoom);
-    currentRoom = null;
+    rooms.delete(roomCode);
     callback?.({ success: true });
   });
 
