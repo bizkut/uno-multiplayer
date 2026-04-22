@@ -26,6 +26,7 @@ A real-time multiplayer UNO card game designed for physical gatherings. Each pla
 | **Rate Limiting** | Per-socket rate limiting (20 events/sec) on all Socket.IO handlers prevents abuse |
 | **Input Sanitization** | Player names are stripped of HTML tags, backticks, `javascript:` URIs, and inline event handlers |
 | **Crypto Shuffle** | Card deck uses `crypto.randomInt()` for cryptographically secure Fisher-Yates shuffle |
+| **Safe Deserialization** | Game state restore uses a property allowlist — prevents prototype pollution and method overwriting |
 | **CORS Policy** | Same-origin only in production; explicit allowlist required in development (no wildcard) |
 
 ## 🚀 Quick Start

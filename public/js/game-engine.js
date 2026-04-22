@@ -531,7 +531,20 @@ class UnoGame {
   static deserialize(json) {
     const data = JSON.parse(json);
     const game = new UnoGame(data.roomCode);
-    Object.assign(game, data);
+
+    // SECURITY: Only copy known safe data properties — never use Object.assign
+    // with untrusted input, as it enables prototype pollution, method overwriting,
+    // and arbitrary property injection.
+    const SAFE_KEYS = [
+      'players', 'deck', 'discardPile', 'currentPlayerIndex',
+      'direction', 'currentColor', 'status', 'winner', 'eventLog',
+      'drawStack', 'pendingDrawPlayerId', 'lastDrawnCard',
+    ];
+    for (const key of SAFE_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        game[key] = data[key];
+      }
+    }
     return game;
   }
 }
