@@ -21,7 +21,7 @@ A real-time multiplayer UNO card game designed for physical gatherings. Each pla
 
 | Measure | Description |
 |---------|-------------|
-| **Session Tokens** | Cryptographic session tokens (`crypto.randomBytes`) authenticate reconnections — prevents player impersonation |
+| **Session Tokens** | Cryptographic session tokens (`crypto.randomBytes`) authenticate reconnections with a 2-minute grace period — prevents player impersonation even after disconnects |
 | **Data Isolation** | Player IDs are never broadcast to clients — only `isYou`/`isHost` flags and array indices are sent |
 | **Rate Limiting** | Per-socket rate limiting (20 events/sec) on all Socket.IO handlers prevents abuse |
 | **Input Sanitization** | Player names are stripped of HTML tags, backticks, `javascript:` URIs, and inline event handlers |

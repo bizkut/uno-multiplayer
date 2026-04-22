@@ -80,6 +80,12 @@ function generateSessionToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// ── Reconnection Grace Period ──
+// When a player disconnects, their session token is preserved for this long
+// so they can reconnect. Without this, an attacker could join with the same
+// playerId after disconnect and bypass token verification entirely.
+const RECONNECT_GRACE_MS = 120_000; // 2 minutes
+
 // ── Broadcast helpers ──
 // SECURITY: Never expose internal playerIds to clients.
 // Use isYou/isHost flags and array indices instead.
@@ -172,15 +178,23 @@ function getRoomContext(socket, callback) {
   return { roomCode, playerId, roomData };
 }
 
-// ── Clean up empty rooms periodically ──
+// ── Clean up empty rooms and expired sessions periodically ──
 setInterval(() => {
+  const now = Date.now();
   for (const [code, roomData] of rooms) {
-    if (roomData.sockets.size === 0) {
+    // Expire disconnected player sessions past the grace period
+    for (const [playerId, entry] of roomData.disconnectedPlayers) {
+      if (now - entry.disconnectedAt > RECONNECT_GRACE_MS) {
+        roomData.disconnectedPlayers.delete(playerId);
+      }
+    }
+
+    // Remove room if no active sockets and no pending reconnections
+    if (roomData.sockets.size === 0 && roomData.disconnectedPlayers.size === 0) {
       rooms.delete(code);
     }
   }
   // Clean up stale rate limit entries
-  const now = Date.now();
   for (const [id, entry] of socketRateLimits) {
     if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS * 10) {
       socketRateLimits.delete(id);
@@ -222,6 +236,10 @@ io.on('connection', (socket) => {
       game,
       host: playerId,
       sockets: new Map(),
+      // SECURITY: Preserve session tokens for disconnected players so
+      // reconnection always requires token auth (prevents session hijack).
+      // Map<playerId, { sessionToken, name, role, disconnectedAt }>
+      disconnectedPlayers: new Map(),
     };
 
     rooms.set(roomCode, roomData);
@@ -258,6 +276,7 @@ io.on('connection', (socket) => {
     }
 
     // SECURITY: Check if this playerId already exists (reconnection attempt)
+    // Check BOTH active sockets AND disconnected players to prevent session hijack.
     let existingEntry = null;
     for (const [existingSocketId, existingInfo] of roomData.sockets) {
       if (existingInfo.playerId === playerId && existingSocketId !== socket.id) {
@@ -266,18 +285,39 @@ io.on('connection', (socket) => {
       }
     }
 
+    // Also check disconnected players — this is the critical fix.
+    // Without this, an attacker could impersonate a disconnected player
+    // because the old socket entry (and its token) was deleted on disconnect.
+    let disconnectedEntry = null;
+    if (!existingEntry) {
+      disconnectedEntry = roomData.disconnectedPlayers.get(playerId);
+    }
+
     let sessionToken;
 
     if (existingEntry) {
-      // Reconnection: REQUIRE valid session token
+      // Reconnection: REQUIRE valid session token (player still has active socket)
       if (!clientToken || clientToken !== existingEntry.info.sessionToken) {
         return callback({ error: 'Invalid session — cannot reconnect as this player' });
       }
       // Token verified — safe to replace the old socket
       sessionToken = existingEntry.info.sessionToken;
       roomData.sockets.delete(existingEntry.socketId);
+    } else if (disconnectedEntry) {
+      // Reconnection of a disconnected player: REQUIRE valid session token
+      if (!clientToken || clientToken !== disconnectedEntry.sessionToken) {
+        return callback({ error: 'Invalid session — cannot reconnect as this player' });
+      }
+      // Token verified — restore the player
+      sessionToken = disconnectedEntry.sessionToken;
+      roomData.disconnectedPlayers.delete(playerId);
+
+      // Re-add the player to the game engine if they were removed on disconnect
+      if (role === 'player' && !roomData.game.players.find(p => p.id === playerId)) {
+        roomData.game.addPlayer(playerId, playerName);
+      }
     } else {
-      // New player joining
+      // Genuinely new player joining
       sessionToken = generateSessionToken();
 
       if (role === 'player' && roomData.game.status === 'waiting') {
@@ -461,6 +501,16 @@ io.on('connection', (socket) => {
 
     roomData.sockets.delete(socket.id);
 
+    // SECURITY FIX: Preserve session token in disconnectedPlayers so that
+    // reconnection always requires valid token auth. Without this, an attacker
+    // could join with the same playerId after disconnect and bypass verification.
+    roomData.disconnectedPlayers.set(info.playerId, {
+      sessionToken: info.sessionToken,
+      name: info.name,
+      role: info.role,
+      disconnectedAt: Date.now(),
+    });
+
     if (info.role === 'player') {
       roomData.game.removePlayer(info.playerId);
       socket.to(`room-${currentRoom}`).emit('player-left', { name: info.name });
@@ -472,8 +522,9 @@ io.on('connection', (socket) => {
       broadcastLobbyState(currentRoom);
     }
 
-    // Clean up empty rooms
-    if (roomData.sockets.size === 0) {
+    // Clean up empty rooms only if no active sockets AND no disconnected players
+    // awaiting reconnection
+    if (roomData.sockets.size === 0 && roomData.disconnectedPlayers.size === 0) {
       rooms.delete(currentRoom);
     }
   });
