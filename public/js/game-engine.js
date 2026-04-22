@@ -2,6 +2,9 @@
  * UNO Game Engine
  * Server-side game logic, validation, and state management.
  */
+// Use Node crypto for secure shuffle when available (server-side)
+const _crypto = typeof require !== 'undefined' ? require('crypto') : null;
+
 class UnoGame {
   constructor(roomCode) {
     this.roomCode = roomCode;
@@ -129,7 +132,8 @@ class UnoGame {
 
   shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      // Use cryptographically secure randomness when available
+      const j = _crypto ? _crypto.randomInt(i + 1) : Math.floor(Math.random() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr;

@@ -74,9 +74,17 @@
 
     socket.on('connect', () => {
       if (hasConnected) {
-        // Reconnection — rejoin existing room
+        // Reconnection — rejoin with session token for auth
         if (roomCode) {
-          socket.emit('join-room', { roomCode, playerName, playerId, role: 'console' }, () => {});
+          socket.emit('join-room', {
+            roomCode, playerName, playerId, role: 'console',
+            sessionToken: session.sessionToken,
+          }, (res) => {
+            if (res && res.sessionToken) {
+              session.sessionToken = res.sessionToken;
+              localStorage.setItem('uno_session', JSON.stringify(session));
+            }
+          });
         }
         return;
       }
@@ -87,6 +95,7 @@
           if (res.success) {
             roomCode = res.roomCode;
             session.roomCode = roomCode;
+            session.sessionToken = res.sessionToken;
             localStorage.setItem('uno_session', JSON.stringify(session));
             lobbyRoomCode.textContent = roomCode;
             consoleRoomCode.textContent = roomCode;
@@ -97,10 +106,16 @@
       } else {
         lobbyRoomCode.textContent = roomCode;
         consoleRoomCode.textContent = roomCode;
-        socket.emit('join-room', { roomCode, playerName, playerId, role: 'console' }, (res) => {
+        socket.emit('join-room', {
+          roomCode, playerName, playerId, role: 'console',
+          sessionToken: session.sessionToken,
+        }, (res) => {
           if (res.error) {
             showToast(res.error, 'error');
             setTimeout(() => { window.location.href = '/'; }, 2000);
+          } else if (res.sessionToken) {
+            session.sessionToken = res.sessionToken;
+            localStorage.setItem('uno_session', JSON.stringify(session));
           }
         });
       }
@@ -138,7 +153,7 @@
     (data.players || []).forEach(p => {
       const li = document.createElement('li');
       li.appendChild(document.createTextNode(p.name));
-      if (p.id === data.hostId) {
+      if (p.isHost) {
         const badge = document.createElement('span');
         badge.className = 'host-badge';
         badge.textContent = ' HOST';

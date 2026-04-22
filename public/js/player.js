@@ -98,7 +98,15 @@
       if (hasConnected) {
         // Reconnection — rejoin existing room instead of creating duplicate
         if (roomCode) {
-          socket.emit('join-room', { roomCode, playerName, playerId, role: 'player' }, () => {});
+          socket.emit('join-room', {
+            roomCode, playerName, playerId, role: 'player',
+            sessionToken: session.sessionToken, // Send token for reconnect auth
+          }, (res) => {
+            if (res && res.sessionToken) {
+              session.sessionToken = res.sessionToken;
+              localStorage.setItem('uno_session', JSON.stringify(session));
+            }
+          });
         }
         return;
       }
@@ -109,6 +117,7 @@
           if (res.success) {
             roomCode = res.roomCode;
             session.roomCode = roomCode;
+            session.sessionToken = res.sessionToken; // Store auth token
             localStorage.setItem('uno_session', JSON.stringify(session));
             lobbyRoomCode.textContent = roomCode;
             gameRoomCode.textContent = roomCode;
@@ -119,10 +128,16 @@
       } else {
         lobbyRoomCode.textContent = roomCode;
         gameRoomCode.textContent = roomCode;
-        socket.emit('join-room', { roomCode, playerName, playerId, role: 'player' }, (res) => {
+        socket.emit('join-room', {
+          roomCode, playerName, playerId, role: 'player',
+          sessionToken: session.sessionToken, // Send token if rejoining
+        }, (res) => {
           if (res.error) {
             showToast(res.error, 'error');
             setTimeout(() => { window.location.href = '/'; }, 2000);
+          } else if (res.sessionToken) {
+            session.sessionToken = res.sessionToken;
+            localStorage.setItem('uno_session', JSON.stringify(session));
           }
         });
       }
@@ -162,16 +177,17 @@
     roomCode = data.roomCode;
 
     lobbyPlayerList.innerHTML = '';
-    (data.players || []).forEach(p => {
+    (data.players || []).forEach((p, idx) => {
       const li = document.createElement('li');
       li.appendChild(document.createTextNode(p.name));
-      if (p.id === data.hostId) {
+      if (p.isHost) {
         const badge = document.createElement('span');
         badge.className = 'host-badge';
         badge.textContent = ' HOST';
         li.appendChild(badge);
       }
-      if (p.id === playerId) {
+      // Server tells us which index is us via yourIndex
+      if (idx === data.yourIndex) {
         li.style.color = 'var(--uno-green)';
         li.style.fontWeight = '700';
       }
@@ -188,8 +204,8 @@
       gameView.classList.remove('hidden');
     }
 
-    // Find my player data
-    const me = state.players.find(p => p.id === playerId);
+    // Find my player data via isYou flag (no playerId comparison needed)
+    const me = state.players.find(p => p.isYou);
     if (me) {
       myHand = me.hand || [];
     }
@@ -197,7 +213,7 @@
     // Am I the current player?
     const currentPlayer = state.players[state.currentPlayerIndex];
     const wasMyTurn = isMyTurn;
-    isMyTurn = currentPlayer && currentPlayer.id === playerId;
+    isMyTurn = currentPlayer && currentPlayer.isYou;
 
     // Turn notification
     if (isMyTurn && !wasMyTurn) {
@@ -277,7 +293,7 @@
   }
 
   function updateUnoAlerts(state) {
-    const me = state.players.find(p => p.id === playerId);
+    const me = state.players.find(p => p.isYou);
     if (me) {
       // Is it urgent to call UNO? (1 or 2 cards and not called)
       const isUrgent = me.cardCount <= 2 && !me.calledUno;
@@ -288,7 +304,7 @@
     // Build alerts for others
     unoAlertsArea.innerHTML = '';
     state.players.forEach(p => {
-      if (p.id === playerId) return;
+      if (p.isYou) return;
 
       if (p.calledUno && p.cardCount === 1) {
         addUnoBadge(p.name, 'Declared UNO! ✅', 'success');
@@ -357,7 +373,8 @@
   }
 
   function checkDrawnCardPrompt() {
-    if (gameState && gameState.pendingDrawPlayerId === playerId) {
+    // Use pendingDrawIsYou flag instead of comparing playerId
+    if (gameState && gameState.pendingDrawIsYou) {
       const drawnCard = myHand[myHand.length - 1];
       if (drawnCard) {
         drawnCardPreview.innerHTML = `<img class="card-img" src="${CARD_BASE}${drawnCard.image}" alt="" style="width:60px; height:90px; border-radius:6px;">`;
@@ -424,13 +441,14 @@
   });
 
   // ── Catch UNO ──
+  // SECURITY: Uses player array index instead of playerId to identify targets
   btnCatchUno.addEventListener('click', () => {
     if (!gameState) return;
 
     catchPlayerList.innerHTML = '';
-    const catchable = gameState.players.filter(p =>
-      p.id !== playerId && p.cardCount === 1 && !p.calledUno
-    );
+    const catchable = gameState.players
+      .map((p, idx) => ({ ...p, playerIndex: idx }))
+      .filter(p => !p.isYou && p.cardCount === 1 && !p.calledUno);
 
     if (catchable.length === 0) {
       showToast('No one to catch!', 'error');
@@ -442,7 +460,7 @@
       btn.className = 'btn btn-primary btn-block';
       btn.textContent = `Catch ${p.name}!`;
       btn.addEventListener('click', () => {
-        socket.emit('catch-uno', { targetId: p.id });
+        socket.emit('catch-uno', { targetIndex: p.playerIndex });
         catchUnoModal.classList.remove('active');
         sfx.unoCall();
       });
@@ -474,7 +492,7 @@
 
   // ── Drawn card prompt ──
   btnPlayDrawn.addEventListener('click', () => {
-    if (!gameState || !gameState.pendingDrawPlayerId) return;
+    if (!gameState || !gameState.pendingDrawIsYou) return;
     const drawnCard = myHand[myHand.length - 1];
     if (!drawnCard) return;
 
@@ -526,7 +544,8 @@
 
   // ── Win Screen ──
   function showWinScreen(winner) {
-    winTitle.textContent = winner.id === playerId ? 'YOU WIN! 🎉' : 'GAME OVER';
+    // Use isYou flag instead of comparing playerId
+    winTitle.textContent = winner.isYou ? 'YOU WIN! 🎉' : 'GAME OVER';
     winName.textContent = winner.name + ' wins!';
     winOverlay.classList.add('active');
     
